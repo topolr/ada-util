@@ -1,0 +1,26 @@
+{
+  "name": "ada-util",
+  "version": "1.0.0",
+  "description": "util for adajs",
+  "main": "\"\"",
+  "scripts": {
+    "test": "\"\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/topolr/ada-util.git"
+  },
+  "keywords": [
+    "util",
+    "adajs"
+  ],
+  "author": "WangJinliang (hou80houzhu)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/topolr/ada-util/issues"
+  },
+  "homepage": "https://github.com/topolr/ada-util#readme",
+  "dependencies": {
+    "colors": "^1.3.2"
+  }
+}

@@ -1,368 +1,516 @@
-let Path = require("path");
 let fs = require("fs");
+let Util = require("util");
+let Path = require("path");
 let Hash = require("./md5");
 
 let util = {
-    make(path) {
-        let dirpath = Path.normalize(path).replace(/\\/g, "/");
-        if (!fs.existsSync(dirpath)) {
-            let a = dirpath.split("/"), pathtmp = a[0] === "" ? "/" : "";
-            let b = a.pop();
-            a.forEach(_dot => {
-                pathtmp += _dot;
-                if (!fs.existsSync(pathtmp)) {
-                    fs.mkdirSync(pathtmp);
-                }
-                pathtmp += "/";
-            });
-            pathtmp = pathtmp + "/" + b;
-            fs.closeSync(fs.openSync(pathtmp, "w"));
-        }
+    regular(path) {
+        return Path.normalize(path).replace(/\\/g, "/");
     },
-    move(from, to) {
+    moveSync(from, to) {
         return new Promise((resolve, reject) => {
-            util.make(to);
+            this.touchSync(to);
             let source = fs.createReadStream(from), dest = fs.createWriteStream(to);
             source.pipe(dest);
             source.on('end', function () {
                 fs.unlink(from, function () {
-                    resolve(new file(to));
+                    resolve(to);
                 });
             });
             source.on('error', function (err) {
                 reject(err);
+            });
+        });
+    },
+    copySync(from, to) {
+        return new Promise((resolve, reject) => {
+            this.touchSync(to);
+            let source = fs.createReadStream(from), dest = fs.createWriteStream(to);
+            source.pipe(dest);
+            source.on('end', function () {
+                resolve(to);
+            });
+            source.on('error', function (err) {
+                reject(err);
+            });
+        });
+    },
+    touchSync(path) {
+        let filePath = this.regular(path);
+        this.mkdir(Path.resolve(filePath, "./../"));
+        fs.closeSync(fs.openSync(filePath, "w"));
+    },
+    move(from, to) {
+        return this.touch(to).then(() => {
+            return new Promise((resolve, reject) => {
+                let source = fs.createReadStream(from), dest = fs.createWriteStream(to);
+                source.pipe(dest);
+                source.on('end', function () {
+                    fs.unlink(from, function () {
+                        resolve(to);
+                    });
+                });
+                source.on('error', function (err) {
+                    reject(err);
+                });
             });
         });
     },
     copy(from, to) {
-        return new Promise((resolve, reject) => {
-            util.make(to);
-            let source = fs.createReadStream(from), dest = fs.createWriteStream(to);
-            source.pipe(dest);
-            source.on('end', function () {
-                resolve(new file(to));
-            });
-            source.on('error', function (err) {
-                reject(err);
+        return this.touch(to).then(() => {
+            return new Promise((resolve, reject) => {
+                let source = fs.createReadStream(from), dest = fs.createWriteStream(to);
+                source.pipe(dest);
+                source.on('end', function () {
+                    resolve(to);
+                });
+                source.on('error', function (err) {
+                    reject(err);
+                });
             });
         });
     },
     mkdir(path) {
-        let dirpath = Path.normalize(path).replace(/\\/g, "/");
+        let dirpath = this.regular(path);
         if (!fs.existsSync(dirpath)) {
-            let a = dirpath.split("/"), pathtmp = a[0] === "" ? "/" : "";
-            a.forEach(_dot => {
-                pathtmp += _dot;
-                if (!fs.existsSync(pathtmp)) {
-                    fs.mkdirSync(pathtmp);
+            dirpath.split("/").reduce((a, part) => {
+                let path = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
+                if (!fs.existsSync(path)) {
+                    fs.mkdirSync(path);
                 }
-                pathtmp += Path.sep;
-            });
+                return path;
+            }, "");
         }
+    },
+    touch(path) {
+        let filePath = this.regular(path);
+        this.mkdir(Path.resolve(filePath, "./../"));
+        return Util.promisify(fs.open)(filePath, "a").then(fd => {
+            return Util.promisify(fs.close)(fd);
+        });
+    },
+    deleteFolderRecursiveSync(path) {
+        let files = [];
+        if (fs.existsSync(path)) {
+            files = fs.readdirSync(path);
+            files.forEach((file, index) => {
+                let curPath = path + "/" + file;
+                if (fs.statSync(curPath).isDirectory()) {
+                    this.deleteFolderRecursiveSync(curPath);
+                } else {
+                    fs.unlinkSync(curPath);
+                }
+            });
+            fs.rmdirSync(path);
+        }
+    },
+    deleteFolderRecursive(path) {
+        if (fs.existsSync(path)) {
+            return Util.promisify(fs.readdir)(path).then(files => {
+                return files.reduce((a, file) => {
+                    return a.then(() => {
+                        let _path = Path.resolve(path, file);
+                        return Util.promisify(fs.stat)(_path).then(t => {
+                            if (t.isDirectory) {
+                                return this.deleteFolderRecursive(_path);
+                            } else {
+                                return Util.promisify(fs.unlink)(_path);
+                            }
+                        })
+                    });
+                }, Promise.resolve());
+            }).then(() => {
+                return Util.promisify(fs.unlink)(path);
+            });
+        } else {
+            return Promise.resolve();
+        }
+    },
+    getAllFilePathsSync(path) {
+        let _fileList = [];
+        fs.readdirSync(path).forEach(item => {
+            let tmpPath = Path.resolve(path, item);
+            if (fs.statSync(tmpPath).isDirectory()) {
+                _fileList = _fileList.concat(this.getAllFilePathsSync(tmpPath));
+            } else {
+                _fileList.push(path);
+            }
+        });
+        return _fileList;
+    },
+    getAllFilePaths(path) {
+        let _fileList = [];
+        return Util.promisify(fs.readdir)(path).then(files => {
+            return files.reduce((a, file) => {
+                return a.then(() => {
+                    let _path = Path.resolve(path, file);
+                    return Util.promisify(fs.stat)(_path).then(t => {
+                        if (t.isDirectory()) {
+                            return this.getAllFilePaths(_path).then(fileList => {
+                                _fileList = _fileList.concat(fileList);
+                            });
+                        } else {
+                            _fileList.push(_path);
+                        }
+                    });
+                });
+            }, Promise.resolve());
+        }).then(() => _fileList);
     }
 };
 
-class File {
+class BaseFile {
     constructor(path) {
-        this._path = Path.normalize(path);
+        this._path = util.regular(path);
+        if (!this.exist) {
+            if (Path.extname(p)) {
+                util.touchSync(path);
+            } else {
+                util.mkdir(path);
+            }
+        }
+    }
+
+    get path() {
+        return this._path;
+    }
+
+    get exist() {
+        return fs.existsSync(this.path);
+    }
+
+    get suffix() {
+        return Path.extname(this.path);
+    }
+
+    get name() {
+        return Path.filename(this.path);
+    }
+
+    get dirname() {
+        return Path.dirname(this.path);
+    }
+
+    get readStream() {
+        return fs.createReadStream(this.path);
+    }
+
+    get writeStream() {
+        fs.createWriteStream(this.path);
+    }
+
+    info() {
+    }
+
+    isFolder() {
+    }
+
+    isFile() {
+    }
+
+    chmod() {
+    }
+
+    chown() {
+    }
+
+    read() {
+    }
+
+    write() {
+    }
+
+    append() {
+    }
+
+    hash() {
     }
 
     remove() {
-        return new Promise((resolve, reject) => {
-            let path = this._path;
-            if (fs.existsSync(path)) {
-                let stats = fs.statSync(path);
-                if (stats.isDirectory()) {
-                    let deleteFolderRecursive = function (path) {
-                        let files = [];
-                        if (fs.existsSync(path)) {
-                            files = fs.readdirSync(path);
-                            files.forEach((file, index) => {
-                                let curPath = path + "/" + file;
-                                if (fs.statSync(curPath).isDirectory()) {
-                                    deleteFolderRecursive(curPath);
-                                } else {
-                                    fs.unlinkSync(curPath);
-                                }
-                            });
-                            fs.rmdirSync(path);
-                        }
-                    };
-                    deleteFolderRecursive(path);
-                    resolve();
-                } else {
-                    fs.unlink(path, () => {
-                        resolve();
-                    });
-                }
-            } else {
-                resolve();
-            }
-            return ps;
-        });
     }
 
-    read(option) {
-        let ops = {
-            encoding: "utf8",
-            flag: 'r'
-        };
-        Object.assign(ops, option);
-        return new Promise((resolve, reject) => {
-            fs.readFile(this._path, ops, (err, data) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(data);
-                }
-            });
-        });
+    moveTo() {
     }
 
-    readSync(encode) {
-        return fs.readFileSync(this._path, encode || "utf-8");
+    copyTo() {
     }
 
-    scan(fn) {
-        let path = this._path;
-        let fileList = [], folderList = [];
-        let walk = function (path, fileList, folderList) {
-            try {
-                fs.readdirSync(path).forEach((item) => {
-                    let tmpPath = path + item, stats = fs.statSync(tmpPath);
-                    if (stats.isDirectory()) {
-                        let r = tmpPath;
-                        if (fn) {
-                            r = fn(tmpPath + Path.sep, false);
-                        }
-                        if (r !== false) {
-                            walk(tmpPath + Path.sep, fileList, folderList);
-                            if (r) {
-                                folderList.push(r);
-                            }
-                        }
-                    } else {
-                        let r = tmpPath;
-                        if (fn) {
-                            r = fn(tmpPath, true);
-                        }
-                        if (r !== false) {
-                            if (r) {
-                                fileList.push(r);
-                            }
-                        }
-                    }
-                });
-            } catch (e) {
-            }
-        };
-        walk(path, fileList, folderList);
-        return fileList;
+    getAllSubFilePaths() {
     }
 
-    create() {
-        util.make(this._path);
+    getSubFilePaths() {
+    }
+
+    getSubFile() {
+    }
+
+    getAllSubFiles() {
+    }
+
+    rename() {
+    }
+
+    moveFile() {
+    }
+
+    copyFile() {
+    }
+}
+
+class SyncFile extends BaseFile {
+    info(option = {}) {
+        return fs.statSync(this.path, option);
+    }
+
+    isFolder() {
+        return this.info().isDirectory();
+    }
+
+    isFile() {
+        return !this.info().isDirectory();
+    }
+
+    read(encode) {
+        return fs.readFileSync(this.path, encode || "utf-8");
+    }
+
+    chmod(mode) {
+        return fs.chmodSync(this.path, mode);
+    }
+
+    chown(uid, gid) {
+        return fs.chownSync(this.path, uid, gid);
+    }
+
+    write(content, ops = {}) {
+        fs.writeFileSync(this.path, content, ops);
         return this;
     }
 
-    write(content, ops) {
-        return new Promise((resolve, reject) => {
-            let dirpath = this._path;
-            util.make(this._path);
-            if (ops) {
-                fs.writeFile(dirpath, content, (err) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
+    append(content, ops = {}) {
+        fs.appendFileSync(this.path, content, ops);
+        return this;
+    }
+
+    hash() {
+        if (this.isFile()) {
+            return Hash.md5(this.read());
+        } else {
+            return null;
+        }
+    }
+
+    remove() {
+        if (this.isFolder()) {
+            util.deleteFolderRecursiveSync(this.path);
+        } else {
+            fs.unlinkSync(this.path);
+        }
+    }
+
+    rename(name) {
+        if (this.isFile()) {
+            let path = Path.resolve(this.path, "./../", `./${name}`);
+            fs.renameSync(this.path, path);
+            return new File(path);
+        }
+    }
+
+    moveTo(path) {
+        if (this.isFolder()) {
+            this.getAllSubFilePaths().forEach(file => util.moveSync(file, path));
+        } else {
+            util.moveSync(this.path, path);
+        }
+        return this;
+    }
+
+    copyTo(path) {
+        if (this.isFolder()) {
+            this.getAllSubFilePaths().forEach(file => util.copySync(file, path));
+        } else {
+            util.copySync(this.path, path);
+        }
+        return this;
+    }
+
+    getAllSubFilePaths() {
+        return util.getAllFilePaths(this.path);
+    }
+
+    getSubFilePaths() {
+        if (this.isFolder()) {
+            return fs.readdirSync(this.path);
+        } else {
+            return [];
+        }
+    }
+
+    getSubFile() {
+        return this.getSubFilePaths().map(files => files.map(file => new File(file)));
+    }
+
+    getAllSubFiles() {
+        return this.getAllSubFilePaths().map(files => files.map(file => new File(file)));
+    }
+
+    moveFile(file) {
+        if (file instanceof SyncFile && this.isFolder()) {
+            file.moveTo(this.path);
+        }
+        return this;
+    }
+
+    copyFile(file) {
+        if (file instanceof SyncFile && this.isFolder()) {
+            file.copyTo(this.path);
+        }
+        return this;
+    }
+}
+
+class File extends BaseFile {
+    info(option = {}) {
+        return Util.promisify(fa.stat)(this.path, option);
+    }
+
+    isFolder() {
+        return this.info().then(t => t.isDirectory());
+    }
+
+    isFile() {
+        return this.info().then(t => !t.isDirectory());
+    }
+
+    chmod(mode) {
+        return Util.promisify(fs.chmod)(this.path, mode);
+    }
+
+    chown(uid, gid) {
+        return Util.promisify(fs.chown)(this.path, uid, gid);
+    }
+
+    read(option) {
+        return Util.promisify(fs.readFile)(this.path, Object.assign({
+            encoding: "utf8",
+            flag: 'r'
+        }, option));
+    }
+
+    write(content, ops = {}) {
+        return Util.promisify(fs.writeFile)(this.path, content, ops).then(() => this);
+    }
+
+    append(content, ops = {}) {
+        return Util.promisify(fs.appendFile)(this.path, content, ops).then(() => this);
+    }
+
+    hash() {
+        return this.isFile().then(result => {
+            if (result) {
+                return this.read(content => Hash.md5(content));
+            } else {
+                return null;
+            }
+        })
+    }
+
+    rename(path) {
+        return this.isFile().then(r => {
+            if (r) {
+                let path = Path.resolve(this.path, "./../", `./${name}`);
+                return Util.promisify(fs.rename)(this.path, path).then(() => {
+                    return new File(path);
                 });
             } else {
-                fs.writeFile(dirpath, content, ops, (err) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
-                });
+                return Promise.resolve();
+            }
+        });
+    }
+
+    remove() {
+        return this.isFolder().then(r => {
+            if (r) {
+                return util.deleteFolderRecursive(this.path);
+            } else {
+                return Util.promisify(fs.unlink)(this.path);
             }
         });
     }
 
     moveTo(path) {
-        let p = this._path;
-        let stats = fs.statSync(p);
-        if (!stats.isDirectory()) {
-            return util.move(p, path);
-        } else {
-            return new Promise((resolve, reject) => {
-                let stats = fs.statSync(path);
-                if (stats.isDirectory()) {
-                    let list = this.scan((patht, isfile) => {
-                        if (isfile) {
-                            return {
-                                to: Path.normalize(path + patht.substring(p.length)),
-                                form: Path.normalize(patht)
-                            };
-                        }
-                    });
-                    Promise.all(list.map(item => {
-                        return util.move(item.from, item.to);
-                    })).then(() => {
-                        resolve();
-                    }, () => {
-                        reject();
-                    });
-                } else {
-                    reject();
-                }
-            });
-        }
+        return this.isFolder().then(r => {
+            if (r) {
+                return this.getAllSubFilePaths().then(files => {
+                    return files.reduce((a, file) => {
+                        return a.then(() => {
+                            return util.move(file, path);
+                        });
+                    }, Promise.resolve());
+                });
+            } else {
+                return util.move(this.path, path);
+            }
+        }).then(() => this);
     }
 
     copyTo(path) {
-        let p = this._path, stats = fs.statSync(p);
-        if (!stats.isDirectory()) {
-            return util.copy(p, path);
+        return this.isFolder().then(r => {
+            if (r) {
+                return this.getAllSubFilePaths().then(files => {
+                    return files.reduce((a, file) => {
+                        return a.then(() => {
+                            return util.copy(file, path);
+                        });
+                    }, Promise.resolve());
+                });
+            } else {
+                return util.copy(this.path, path);
+            }
+        }).then(() => this);
+    }
+
+    getAllSubFilePaths() {
+        return util.getAllFilePaths(this.path);
+    }
+
+    getSubFilePaths() {
+        if (this.isFolderSync()) {
+            return Util.promisify(fs.readdir)(this.path);
         } else {
-            return new Promise((resolve, reject) => {
-                let stats = fs.statSync(path);
-                if (stats.isDirectory()) {
-                    let list = this.scan((patht, isfile) => {
-                        if (isfile) {
-                            return {
-                                to: Path.normalize(path + patht.substring(p.length)),
-                                form: Path.normalize(patht)
-                            };
-                        }
-                    });
-                    Promise.all(list.map(item => {
-                        return util.copy(item.from, item.to);
-                    })).then(() => {
-                        resolve();
-                    }, () => {
-                        reject();
-                    });
-                } else {
-                    reject();
+            return [];
+        }
+    }
+
+    getSubFile() {
+        return this.getSubFilePaths().then(files => files.map(file => new File(file)));
+    }
+
+    getAllSubFiles() {
+        return this.getAllSubFilePaths().then(files => files.map(file => new File(file)));
+    }
+
+    moveFile(file) {
+        if (file instanceof File) {
+            return this.isFolder().then(f => {
+                if (f) {
+                    return file.moveTo(this.path).then(() => this);
                 }
             });
         }
+        return Promise.resolve();
     }
 
-    isFolder() {
-        return fs.statSync(this._path).isDirectory();
-    }
-
-    isFile() {
-        return !fs.statSync(this._path).isDirectory();
-    }
-
-    isExists() {
-        return fs.existsSync(this._path);
-    }
-
-    hash() {
-        try {
-            if (fs.statSync(this._path).isFile()) {
-                return Hash.md5(fs.readFileSync(this._path));
-            }
-        } catch (e) {
-        }
-        return "";
-    }
-
-    subscan(fn) {
-        let tmpPatht = this._path, r = [];
-        let stats = fs.statSync(tmpPatht);
-        if (stats.isDirectory()) {
-            fs.readdirSync(tmpPatht).forEach(function (item) {
-                let tmpPath = tmpPatht + Path.sep + item;
-                let stats = fs.statSync(tmpPath);
-                if (!stats.isDirectory()) {
-                    let t = tmpPath;
-                    if (fn) {
-                        t = fn(tmpPath, true);
-                    }
-                    if (t !== false) {
-                        if (t) {
-                            r.push(t);
-                        }
-                    } else {
-                        return false;
-                    }
-                } else {
-                    let t = tmpPath + Path.sep;
-                    if (fn) {
-                        t = fn(t, false);
-                    }
-                    if (t !== false) {
-                        if (t) {
-                            r.push(t);
-                        }
-                    } else {
-                        return false;
-                    }
+    copyFile(file) {
+        if (file instanceof File) {
+            return this.isFolder().then(f => {
+                if (f) {
+                    return file.copyTo(this.path).then(() => this);
                 }
             });
         }
-        return r;
-    }
-
-    infoSync() {
-        return fs.statSync(this._path);
-    }
-
-    info() {
-        return new Promise((resolve, reject) => {
-            fs.stat(this._path, (a, b) => {
-                if (!a) {
-                    resolve(b);
-                } else {
-                    reject();
-                }
-            });
-        });
-    }
-
-    suffix() {
-        let name = this.name();
-        if (name) {
-            let a = name.split(".");
-            if (a.length > 1) {
-                return a.pop();
-            }
-        }
-        return "";
-    }
-
-    name() {
-        if (this.isFile()) {
-            return this._path.split(Path.sep).pop();
-        }
-        return "";
-    }
-
-    path() {
-        return this._path;
-    }
-
-    info() {
-        return new Promise((resolve, reject) => {
-            fs.stat(this._path, (error, a) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(a);
-                }
-            });
-        });
-    }
-
-    mkdir() {
-        util.mkdir(this._path);
-        return this;
+        return Promise.resolve();
     }
 }
 
-module.exports = File;
+module.exports = {File, SyncFile, util};
