@@ -2,10 +2,8 @@
   "name": "ada-util",
   "version": "1.0.0",
   "description": "util for adajs",
-  "main": "\"\"",
-  "scripts": {
-    "test": "\"\""
-  },
+  "main": "./index.js",
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/topolr/ada-util.git"

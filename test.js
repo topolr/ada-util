@@ -1,5 +1,5 @@
 let Path = require("path");
-let {File} = require("./file");
+let {File} = require("./src/file");
 
 // new File(__dirname).getAllSubFilePaths().then(files => files.forEach(file => console.log(file)))
 // new File(Path.resolve(__dirname, "./package-lock.json")).read().then(c => console.log(c));

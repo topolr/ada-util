@@ -516,4 +516,4 @@ class File extends BaseFile {
     }
 }
 
-module.exports = {File, SyncFile, util};
+module.exports = {File, SyncFile};

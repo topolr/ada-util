@@ -1,4 +1,4 @@
-let colors = require("colors");
+require("colors");
 
 class Commander {
     constructor() {
@@ -60,7 +60,6 @@ class Commander {
             }
         }
     }
-
 }
 
 module.exports = Commander;
