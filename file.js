@@ -163,10 +163,10 @@ class BaseFile {
     constructor(path) {
         this._path = util.regular(path);
         if (!this.exist) {
-            if (Path.extname(p)) {
-                util.touchSync(path);
+            if (Path.extname(this.path)) {
+                util.touchSync(this.path);
             } else {
-                util.mkdir(path);
+                util.mkdir(this.path);
             }
         }
     }
@@ -312,13 +312,14 @@ class SyncFile extends BaseFile {
         if (this.isFile()) {
             let path = Path.resolve(this.path, "./../", `./${name}`);
             fs.renameSync(this.path, path);
-            return new File(path);
+            this._path = path;
+            return this;
         }
     }
 
     moveTo(path) {
         if (this.isFolder()) {
-            this.getAllSubFilePaths().forEach(file => util.moveSync(file, path));
+            this.getAllSubFilePaths().forEach(file => util.moveSync(file, Path.resolve(path, file.substring(this.path.length + 1))));
         } else {
             util.moveSync(this.path, path);
         }
@@ -327,7 +328,7 @@ class SyncFile extends BaseFile {
 
     copyTo(path) {
         if (this.isFolder()) {
-            this.getAllSubFilePaths().forEach(file => util.copySync(file, path));
+            this.getAllSubFilePaths().forEach(file => util.copySync(file, Path.resolve(path, file.substring(this.path.length + 1))));
         } else {
             util.copySync(this.path, path);
         }
@@ -390,7 +391,7 @@ class File extends BaseFile {
         return Util.promisify(fs.chown)(this.path, uid, gid);
     }
 
-    read(option) {
+    read(option = {}) {
         return Util.promisify(fs.readFile)(this.path, Object.assign({
             encoding: "utf8",
             flag: 'r'
@@ -408,19 +409,20 @@ class File extends BaseFile {
     hash() {
         return this.isFile().then(result => {
             if (result) {
-                return this.read(content => Hash.md5(content));
+                return this.read().then(content => Hash.md5(content));
             } else {
-                return null;
+                return Promise.resolve(null);
             }
         })
     }
 
-    rename(path) {
+    rename(name) {
         return this.isFile().then(r => {
             if (r) {
                 let path = Path.resolve(this.path, "./../", `./${name}`);
                 return Util.promisify(fs.rename)(this.path, path).then(() => {
-                    return new File(path);
+                    this._path = path;
+                    return this;
                 });
             } else {
                 return Promise.resolve();
@@ -444,7 +446,7 @@ class File extends BaseFile {
                 return this.getAllSubFilePaths().then(files => {
                     return files.reduce((a, file) => {
                         return a.then(() => {
-                            return util.move(file, path);
+                            return util.move(file, Path.resolve(path, file.substring(this.path.length + 1)));
                         });
                     }, Promise.resolve());
                 });
@@ -460,7 +462,7 @@ class File extends BaseFile {
                 return this.getAllSubFilePaths().then(files => {
                     return files.reduce((a, file) => {
                         return a.then(() => {
-                            return util.copy(file, path);
+                            return util.copy(file, Path.resolve(path, file.substring(this.path.length + 1)));
                         });
                     }, Promise.resolve());
                 });
