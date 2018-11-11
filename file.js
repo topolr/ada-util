@@ -371,7 +371,7 @@ class SyncFile extends BaseFile {
 
 class File extends BaseFile {
     info(option = {}) {
-        return Util.promisify(fa.stat)(this.path, option);
+        return Util.promisify(fs.stat)(this.path, option);
     }
 
     isFolder() {
@@ -475,11 +475,12 @@ class File extends BaseFile {
     }
 
     getSubFilePaths() {
-        if (this.isFolderSync()) {
-            return Util.promisify(fs.readdir)(this.path);
-        } else {
-            return [];
-        }
+        return this.isFolder().then(r => {
+            if (r) {
+                return Util.promisify(fs.readdir)(this.path);
+            }
+            return Promise.resolve([]);
+        });
     }
 
     getSubFile() {

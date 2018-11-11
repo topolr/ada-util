@@ -1,3 +1,3 @@
-let {util} = require("./file");
+let {File} = require("./file");
 
-util.touch('/Users/wangjinliang/ada/ada-util/tt/ee/tt/aa.txt');
+new File(__dirname).getAllSubFilePaths().then(files => files.forEach(file => console.log(file)))
