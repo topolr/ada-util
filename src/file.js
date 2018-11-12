@@ -192,7 +192,7 @@ class BaseFile {
 		fs.createWriteStream(this.path);
 	}
 
-	create() {
+	make() {
 		if (!this.exist) {
 			if (Path.extname(this.path)) {
 				util.touchSync(this.path);
