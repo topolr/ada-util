@@ -81,12 +81,12 @@ let util = {
 		}, "");
 	},
 	mkdir(path) {
-		let dirpath = this.regular(path);
-		return dirpath.split("/").reduce((a, part) => {
-			return a.then(() => {
-				let path = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
-				if (!fs.existsSync(path)) {
-					return Util.promisify(fs.mkdir)(path);
+		let dirpath = this.regular(path), a = "";
+		return dirpath.split("/").reduce((b, part) => {
+			return b.then(() => {
+				a = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
+				if (!fs.existsSync(a)) {
+					return Util.promisify(fs.mkdir)(a);
 				}
 			});
 		}, Promise.resolve());
