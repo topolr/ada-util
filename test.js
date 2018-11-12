@@ -17,4 +17,6 @@ let {File} = require("./src/file");
 // new File(Path.resolve(__dirname,"./ee.json")).remove().then(()=>console.log('====='));
 
 // new File(Path.resolve(__dirname, "./node_modules/colors")).copyTo(Path.resolve(__dirname, "./aa")).then(f => console.log(f)).catch(e => console.log(e));
-new File(Path.resolve(__dirname, "./node_modules/colors")).moveTo(Path.resolve(__dirname, "./aa/bb")).then(f => console.log(f)).catch(e => console.log(e));
+// new File(Path.resolve(__dirname, "./node_modules/colors")).moveTo(Path.resolve(__dirname, "./aa/bb")).then(f => console.log(f)).catch(e => console.log(e));
+
+new File(Path.resolve(__dirname, "./lang")).empty().then(() => console.log('done'));
