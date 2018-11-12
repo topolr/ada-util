@@ -310,6 +310,7 @@ class SyncFile extends BaseFile {
 	}
 
 	write(content, ops = {}) {
+		this.make();
 		fs.writeFileSync(this.path, content, ops);
 		return this;
 	}
@@ -452,7 +453,9 @@ class File extends BaseFile {
 	}
 
 	write(content, ops = {}) {
-		return Util.promisify(fs.writeFile)(this.path, content, ops).then(() => this);
+		return this.make().then(() => {
+			return Util.promisify(fs.writeFile)(this.path, content, ops).then(() => this);
+		});
 	}
 
 	append(content, ops = {}) {
