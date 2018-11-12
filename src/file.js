@@ -37,7 +37,7 @@ let util = {
 	},
 	touchSync(path) {
 		let filePath = this.regular(path);
-		this.mkdir(Path.resolve(filePath, "./../"));
+		this.mkdirSync(Path.resolve(filePath, "./../"));
 		fs.closeSync(fs.openSync(filePath, "w"));
 	},
 	move(from, to) {
@@ -70,23 +70,33 @@ let util = {
 			});
 		});
 	},
+	mkdirSync(path) {
+		let dirpath = this.regular(path);
+		dirpath.split("/").reduce((a, part) => {
+			let path = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
+			if (!fs.existsSync(path)) {
+				fs.mkdirSync(path);
+			}
+			return path;
+		}, "");
+	},
 	mkdir(path) {
 		let dirpath = this.regular(path);
-		if (!fs.existsSync(dirpath)) {
-			dirpath.split("/").reduce((a, part) => {
+		dirpath.split("/").reduce((a, part) => {
+			return a.then(() => {
 				let path = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
 				if (!fs.existsSync(path)) {
-					fs.mkdirSync(path);
+					return Util.promisify(fs.mkdir)(path);
 				}
-				return path;
-			}, "");
-		}
+			});
+		}, Promise.resolve());
 	},
 	touch(path) {
 		let filePath = this.regular(path);
-		this.mkdir(Path.resolve(filePath, "./../"));
-		return Util.promisify(fs.open)(filePath, "a").then(fd => {
-			return Util.promisify(fs.close)(fd);
+		return this.mkdir(Path.resolve(filePath, "./../")).then(() => {
+			return Util.promisify(fs.open)(filePath, "a").then(fd => {
+				return Util.promisify(fs.close)(fd);
+			});
 		});
 	},
 	deleteFolderRecursiveSync(path, self = true) {
@@ -193,13 +203,6 @@ class BaseFile {
 	}
 
 	make() {
-		if (!this.exist) {
-			if (Path.extname(this.path)) {
-				util.touchSync(this.path);
-			} else {
-				util.mkdir(this.path);
-			}
-		}
 	}
 
 	info() {
@@ -271,6 +274,17 @@ class BaseFile {
 }
 
 class SyncFile extends BaseFile {
+	make() {
+		if (!this.exist) {
+			if (Path.extname(this.path)) {
+				util.touchSync(this.path);
+			} else {
+				util.mkdir(this.path);
+			}
+		}
+		return this;
+	}
+
 	info(option = {}) {
 		return fs.statSync(this.path, option);
 	}
@@ -385,9 +399,8 @@ class SyncFile extends BaseFile {
 	empty() {
 		if (this.isFolder()) {
 			util.deleteFolderRecursiveSync(this.path, false);
-		} else {
-			fs.unlinkSync(this.path);
 		}
+		return this;
 	}
 
 	transform() {
@@ -400,6 +413,17 @@ class SyncFile extends BaseFile {
 }
 
 class File extends BaseFile {
+	make() {
+		if (!this.exist) {
+			if (Path.extname(this.path)) {
+				return util.touch(this.path).then(() => this);
+			} else {
+				return util.mkdir(this.path).then(() => this);
+			}
+		}
+		return Promise.resolve(this);
+	}
+
 	info(option = {}) {
 		return Util.promisify(fs.stat)(this.path, option);
 	}
@@ -547,10 +571,9 @@ class File extends BaseFile {
 	empty() {
 		return this.isFolder().then(r => {
 			if (r) {
-				return util.deleteFolderRecursive(this.path, false);
-			} else {
-				return Util.promisify(fs.unlink)(this.path);
+				return util.deleteFolderRecursive(this.path, false).then(() => this);
 			}
+			return Promise.resolve(this);
 		});
 	}
 
