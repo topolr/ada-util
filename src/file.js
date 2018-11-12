@@ -82,7 +82,7 @@ let util = {
 	},
 	mkdir(path) {
 		let dirpath = this.regular(path);
-		dirpath.split("/").reduce((a, part) => {
+		return dirpath.split("/").reduce((a, part) => {
 			return a.then(() => {
 				let path = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
 				if (!fs.existsSync(path)) {
