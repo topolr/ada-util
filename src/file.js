@@ -271,6 +271,12 @@ class BaseFile {
 	isSync() {
 		return false;
 	}
+
+	mkdir() {
+	}
+
+	touch() {
+	}
 }
 
 class SyncFile extends BaseFile {
@@ -279,8 +285,22 @@ class SyncFile extends BaseFile {
 			if (Path.extname(this.path)) {
 				util.touchSync(this.path);
 			} else {
-				util.mkdir(this.path);
+				util.mkdirSync(this.path);
 			}
+		}
+		return this;
+	}
+
+	mkdir() {
+		if (!this.exist) {
+			util.mkdirSync(this.path);
+		}
+		return this;
+	}
+
+	touch() {
+		if (!this.exist) {
+			util.touchSync(this.path);
 		}
 		return this;
 	}
@@ -425,6 +445,20 @@ class File extends BaseFile {
 		return Promise.resolve(this);
 	}
 
+	mkdir() {
+		if (!this.exist) {
+			return util.mkdir(this.path).then(() => this);
+		}
+		return Promise.resolve(this);
+	}
+
+	touch() {
+		if (!this.exist) {
+			return util.touch(this.path).then(() => this);
+		}
+		return Promise.resolve(this);
+	}
+
 	info(option = {}) {
 		return Util.promisify(fs.stat)(this.path, option);
 	}
@@ -453,7 +487,7 @@ class File extends BaseFile {
 	}
 
 	write(content, ops = {}) {
-		return this.make().then(() => {
+		return this.touch().then(() => {
 			return Util.promisify(fs.writeFile)(this.path, content, ops).then(() => this);
 		});
 	}
