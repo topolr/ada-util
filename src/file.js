@@ -73,7 +73,7 @@ let util = {
 	mkdirSync(path) {
 		let dirpath = this.regular(path);
 		dirpath.split("/").reduce((a, part) => {
-			let path = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
+			let path = (a ? (a === '/' ? '/' : (a + "/")) : part.indexOf(":") === -1 ? "/" : "") + part;
 			if (!fs.existsSync(path)) {
 				fs.mkdirSync(path);
 			}
@@ -84,7 +84,7 @@ let util = {
 		let dirpath = this.regular(path), a = "";
 		return dirpath.split("/").reduce((b, part) => {
 			return b.then(() => {
-				a = (a ? (a === '/' ? '/' : (a + "/")) : ("/")) + part;
+				a = (a ? (a === '/' ? '/' : (a + "/")) : part.indexOf(":") === -1 ? "/" : "") + part;
 				if (!fs.existsSync(a)) {
 					return Util.promisify(fs.mkdir)(a);
 				}
