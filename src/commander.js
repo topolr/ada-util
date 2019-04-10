@@ -16,9 +16,9 @@ class Commander {
     bind({command, desc, paras, fn}) {
         this._commands[command] = {
             name: command,
-            desc: desc,
-            fn: fn,
-            paras: paras
+            desc,
+            fn,
+            paras
         };
         return this;
     }
@@ -62,8 +62,8 @@ class Commander {
     }
 
     cmds(fns) {
-        fns.forEach(function (a) {
-            let command = a.command, desc = a.desc, paras = a.paras, fn = a.fn;
+        fns.forEach(a => {
+            let {command, desc, paras, fn} = a;
             this.bind({command, desc, paras, fn});
         });
     }
