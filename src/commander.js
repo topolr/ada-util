@@ -60,6 +60,13 @@ class Commander {
             }
         }
     }
+
+    cmds(fns) {
+        fns.forEach(function (a) {
+            let command = a.command, desc = a.desc, paras = a.paras, fn = a.fn;
+            this.bind({command, desc, paras, fn});
+        });
+    }
 }
 
 module.exports = Commander;
