@@ -143,7 +143,7 @@ let util = {
 			if (fs.statSync(tmpPath).isDirectory()) {
 				_fileList = _fileList.concat(this.getAllFilePathsSync(tmpPath));
 			} else {
-				_fileList.push(path);
+				_fileList.push(tmpPath);
 			}
 		});
 		return _fileList;
@@ -384,7 +384,7 @@ class SyncFile extends BaseFile {
 	}
 
 	getAllSubFilePaths() {
-		return util.getAllFilePaths(this.path);
+		return util.getAllFilePathsSync(this.path);
 	}
 
 	getSubFilePaths() {
@@ -619,4 +619,4 @@ class File extends BaseFile {
 	}
 }
 
-module.exports = {File, SyncFile};
+module.exports = { File, SyncFile };
